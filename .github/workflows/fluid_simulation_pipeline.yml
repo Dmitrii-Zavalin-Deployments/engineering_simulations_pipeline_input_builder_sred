@@ -21,13 +21,14 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install OpenVDB system dependencies
+      - name: Install system dependencies (Keep TBB if needed)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopenvdb-dev libtbb-dev  # Added TBB for compatibility
+          sudo apt-get install -y libtbb-dev
 
-      - name: Install base dependencies
+      - name: Install base dependencies (NumPy & HDF5 replace PyOpenVDB)
         run: |
+          pip install --upgrade numpy h5py scipy pytest
           pip install -r requirements.txt
 
       - name: Debug Repository Structure
@@ -41,6 +42,8 @@ jobs:
           fi
 
       - name: Run script to process fluid data
+        env:
+          OUTPUT_FORMAT: json  # Assuming output format remains JSON
         run: python "$GITHUB_WORKSPACE/src/generate_blender_format.py"
 
       # ✅ Execute Unit & Integration Tests After Output File Generation

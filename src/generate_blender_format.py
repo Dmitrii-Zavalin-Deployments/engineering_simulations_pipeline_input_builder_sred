@@ -40,10 +40,14 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
     # Debugging: Print actual shape of velocity history
     print(f"🔍 velocity_history shape: {velocity_history.shape}")
 
-    # Ensure correct unpacking of shape
-    num_timesteps, num_nodes = velocity_history.shape[:2]  # Only take first two dimensions
+    # Ensure correct unpacking of shape dynamically
+    num_timesteps = velocity_history.shape[0]  # Time steps
+    num_nodes = np.prod(velocity_history.shape[1:-1])  # Compute total nodes dynamically
 
-    nodes_coords = np.load(nodes_file)  # Shape: (num_nodes, 3)
+    # Load node coordinates
+    nodes_coords = np.load(nodes_file)
+    print(f"🔍 nodes_coords shape: {nodes_coords.shape}")  # Debug node shape
+
     time_steps = np.load(time_file)  # Shape: (num_timesteps,)
     
     # Load grid metadata
@@ -52,7 +56,12 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
 
     # Ensure all data dimensions are consistent
     if nodes_coords.shape[0] != num_nodes:
-        raise ValueError("Mismatch between velocity data and node coordinates!")
+        raise ValueError(f"❌ Mismatch! Expected {num_nodes} nodes but found {nodes_coords.shape[0]}")
+
+    # Reshape node coordinates if necessary
+    if nodes_coords.shape[0] != num_nodes:
+        print(f"⚠️ Attempting to reshape nodes_coords to match expected node count ({num_nodes})...")
+        nodes_coords = nodes_coords.reshape((num_nodes, 3))
 
     # Initialize particle data structure
     particles = []
@@ -65,7 +74,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         }
 
         for timestep_idx, time in enumerate(time_steps):
-            velocity = velocity_history[timestep_idx, node_id].tolist()
+            velocity = velocity_history[timestep_idx].reshape(num_nodes, 3)[node_id].tolist()  # Reshape velocities dynamically
             new_position = (nodes_coords[node_id] + np.array(velocity) * time).tolist()
 
             particle["motion"].append({

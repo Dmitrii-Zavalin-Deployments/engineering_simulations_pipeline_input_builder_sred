@@ -13,7 +13,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         grid_metadata_file (str): Path to grid metadata `.json` file.
         output_file (str): Path to output fluid particle JSON file.
     """
-    
+
     # Resolve absolute paths using GITHUB_WORKSPACE
     workspace_dir = os.getenv("GITHUB_WORKSPACE", ".")
     velocity_file = os.path.join(workspace_dir, velocity_file)
@@ -35,7 +35,14 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
             raise FileNotFoundError(f"❌ Error: Required file not found - {file_path}")
 
     # Load velocity, nodes, and time step data
-    velocity_history = np.load(velocity_file)  # Shape: (num_timesteps, num_nodes, 3)
+    velocity_history = np.load(velocity_file)
+
+    # Debugging: Print actual shape of velocity history
+    print(f"🔍 velocity_history shape: {velocity_history.shape}")
+
+    # Ensure correct unpacking of shape
+    num_timesteps, num_nodes = velocity_history.shape[:2]  # Only take first two dimensions
+
     nodes_coords = np.load(nodes_file)  # Shape: (num_nodes, 3)
     time_steps = np.load(time_file)  # Shape: (num_timesteps,)
     
@@ -44,8 +51,6 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         grid_metadata = json.load(f)
 
     # Ensure all data dimensions are consistent
-    num_timesteps, num_nodes, _ = velocity_history.shape
-
     if nodes_coords.shape[0] != num_nodes:
         raise ValueError("Mismatch between velocity data and node coordinates!")
 
@@ -61,7 +66,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
 
         for timestep_idx, time in enumerate(time_steps):
             velocity = velocity_history[timestep_idx, node_id].tolist()
-            new_position = (nodes_coords[node_id] + velocity * time).tolist()
+            new_position = (nodes_coords[node_id] + np.array(velocity) * time).tolist()
 
             particle["motion"].append({
                 "time": float(time),

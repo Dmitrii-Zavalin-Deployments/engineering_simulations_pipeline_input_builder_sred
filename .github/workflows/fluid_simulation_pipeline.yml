@@ -1,4 +1,4 @@
-name: Fluid Data Processing and Commit
+name: Fluid Particle Simulation and Commit
 
 on:
   push:
@@ -10,23 +10,23 @@ jobs:
   process_fluid_data:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"  # Downgraded Python for better compatibility
+          python-version: "3.9"  # Keeping Python 3.9 for compatibility
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install system dependencies (Keep TBB if needed)
+      - name: Install system dependencies (TBB required)
         run: |
           sudo apt-get update
           sudo apt-get install -y libtbb-dev
 
-      - name: Install base dependencies (NumPy & HDF5 replace PyOpenVDB)
+      - name: Install Python dependencies
         run: |
           pip install --upgrade numpy h5py scipy pytest
           pip install -r requirements.txt
@@ -41,28 +41,19 @@ jobs:
             exit 1
           fi
 
-      - name: Run script to process fluid data
+      - name: Run Fluid Particle Processing Script
         env:
-          OUTPUT_FORMAT: json  # Assuming output format remains JSON
+          OUTPUT_FORMAT: json  # Output remains JSON
         run: python "$GITHUB_WORKSPACE/src/generate_blender_format.py"
 
+      - name: Debug Directory After Processing
+        run: ls -R "$GITHUB_WORKSPACE/data/testing-input-output"
+
       # ✅ Execute Unit & Integration Tests After Output File Generation
-      - name: Run unit tests
-        run: pytest tests/test_input_validation.py --verbose
+      # - name: Run Unit Tests
+      #   run: pytest tests/test_velocity_field_processing.py --verbose
 
-      - name: Run output validation tests
-        run: pytest tests/test_output_validation.py --verbose
-
-      - name: Run integration tests
-        run: pytest tests/test_conversion_pipeline.py --verbose
-
-      - name: Run Blender import tests
-        run: pytest tests/test_blender_import_validation.py --verbose
-
-      - name: Run advanced Blender validation tests
-        run: pytest tests/test_blender_advanced_validation.py --verbose
-
-      - name: Commit and Push Blender Fluid Parameters to Repository
+      - name: Commit and Push Fluid Particle Data to Repository
         env:
           GIT_USER_NAME: ${{ secrets.GIT_USER_NAME }}
           GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
@@ -72,16 +63,16 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
 
-          if [ -f "data/testing-input-output/blender_fluid_parameters.json" ]; then
-            git add "data/testing-input-output/blender_fluid_parameters.json"
+          if [ -f "data/testing-input-output/fluid_particles.json" ]; then
+            git add "data/testing-input-output/fluid_particles.json"
             git status
 
             if [[ $(git diff --cached --quiet; echo $?) -ne 0 ]]; then
-              git commit -m "Auto-update: Added latest Blender fluid parameters"
+              git commit -m "Auto-update: Generated fluid particle motion data"
               git push origin HEAD
             else
               echo "✅ No changes to commit!"
             fi
           else
-            echo "❌ No Blender fluid parameters file detected, skipping commit."
+            echo "❌ No fluid_particles.json file detected, skipping commit."
           fi

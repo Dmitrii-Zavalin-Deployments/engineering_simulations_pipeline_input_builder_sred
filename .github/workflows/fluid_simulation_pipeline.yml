@@ -49,8 +49,9 @@ jobs:
       - name: Run Fluid Particle Processing Script
         env:
           OUTPUT_FORMAT: json  # Output remains JSON
-        working-directory: "$GITHUB_WORKSPACE/src"
-        run: python generate_blender_format.py
+        run: |
+          cd "$GITHUB_WORKSPACE/src"
+          python generate_blender_format.py
 
       - name: Debug Directory After Processing
         run: ls -R "$GITHUB_WORKSPACE/data/testing-input-output"

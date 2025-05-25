@@ -14,6 +14,26 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         output_file (str): Path to output fluid particle JSON file.
     """
     
+    # Resolve absolute paths using GITHUB_WORKSPACE
+    workspace_dir = os.getenv("GITHUB_WORKSPACE", ".")
+    velocity_file = os.path.join(workspace_dir, velocity_file)
+    nodes_file = os.path.join(workspace_dir, nodes_file)
+    time_file = os.path.join(workspace_dir, time_file)
+    grid_metadata_file = os.path.join(workspace_dir, grid_metadata_file)
+    output_file = os.path.join(workspace_dir, output_file)
+
+    # Debugging: Print resolved paths
+    print(f"🔎 Checking file paths:")
+    print(f"  - Velocity file: {velocity_file}")
+    print(f"  - Nodes file: {nodes_file}")
+    print(f"  - Time file: {time_file}")
+    print(f"  - Grid Metadata file: {grid_metadata_file}")
+
+    # Ensure required files exist before proceeding
+    for file_path in [velocity_file, nodes_file, time_file, grid_metadata_file]:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"❌ Error: Required file not found - {file_path}")
+
     # Load velocity, nodes, and time step data
     velocity_history = np.load(velocity_file)  # Shape: (num_timesteps, num_nodes, 3)
     nodes_coords = np.load(nodes_file)  # Shape: (num_nodes, 3)

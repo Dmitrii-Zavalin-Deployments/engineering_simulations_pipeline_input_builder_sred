@@ -11,7 +11,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         nodes_file (str): Path to nodes coordinates `.npy` file.
         time_file (str): Path to simulation time steps `.npy` file.
         grid_metadata_file (str): Path to grid metadata `.json` file.
-        output_file (str): Path to output fluid particle JSON file.
+        output_file (str): Path to output fluid particle `.npy` file.
     """
 
     # Resolve absolute paths using GITHUB_WORKSPACE
@@ -20,7 +20,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
     nodes_file = os.path.join(workspace_dir, nodes_file)
     time_file = os.path.join(workspace_dir, time_file)
     grid_metadata_file = os.path.join(workspace_dir, grid_metadata_file)
-    output_file = os.path.join(workspace_dir, output_file)
+    output_file = os.path.join(workspace_dir, output_file) # Output file will now be .npy
 
     # Debugging: Print resolved paths
     print(f"🔎 Checking file paths:")
@@ -28,6 +28,7 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
     print(f"  - Nodes file: {nodes_file}")
     print(f"  - Time file: {time_file}")
     print(f"  - Grid Metadata file: {grid_metadata_file}")
+    print(f"  - Output file: {output_file}")
 
     # Ensure required files exist before proceeding
     for file_path in [velocity_file, nodes_file, time_file, grid_metadata_file]:
@@ -42,7 +43,14 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
 
     # Ensure correct unpacking of shape dynamically
     num_timesteps = velocity_history.shape[0]  # Time steps
-    num_nodes = np.prod(velocity_history.shape[1:-1])  # Compute total nodes dynamically
+    # Compute total nodes dynamically, assuming last dimension is velocity components (e.g., 3 for 3D)
+    # The reshape below assumes the velocity history is (timesteps, num_nodes, 3) or similar
+    # If velocity_history.shape is (num_timesteps, dim1, dim2, ..., 3), then num_nodes is dim1 * dim2 * ...
+    if velocity_history.ndim > 2:
+        num_nodes = np.prod(velocity_history.shape[1:-1])
+    else: # If velocity_history.shape is (num_timesteps, num_nodes * 3) or (num_timesteps, num_nodes, 3)
+        num_nodes = velocity_history.shape[1] if velocity_history.ndim == 2 else velocity_history.shape[1] // 3
+
 
     # Load node coordinates
     nodes_coords = np.load(nodes_file)
@@ -55,46 +63,64 @@ def generate_fluid_particles(velocity_file, nodes_file, time_file, grid_metadata
         grid_metadata = json.load(f)
 
     # Ensure all data dimensions are consistent
-    if nodes_coords.shape[0] != num_nodes:
-        raise ValueError(f"❌ Mismatch! Expected {num_nodes} nodes but found {nodes_coords.shape[0]}")
-
-    # Reshape node coordinates if necessary
-    if nodes_coords.shape[0] != num_nodes:
-        print(f"⚠️ Attempting to reshape nodes_coords to match expected node count ({num_nodes})...")
+    # nodes_coords should be (num_nodes, 3)
+    if nodes_coords.shape[0] != num_nodes and nodes_coords.size // 3 == num_nodes:
+        print(f"⚠️ Attempting to reshape nodes_coords from {nodes_coords.shape} to ({num_nodes}, 3)...")
         nodes_coords = nodes_coords.reshape((num_nodes, 3))
+    elif nodes_coords.shape[0] != num_nodes:
+        raise ValueError(f"❌ Mismatch! Expected {num_nodes} nodes based on velocity history, but found {nodes_coords.shape[0]} in nodes_coords after potential reshape.")
 
-    # Initialize particle data structure
-    particles = []
-    
+    # Initialize particle data structure.
+    # Since we're saving to .npy, we'll aim for structured NumPy arrays or a dictionary of arrays.
+    # Storing a complex nested dictionary directly in .npy isn't ideal for performance/readability.
+    # Instead, we'll create separate arrays for initial_positions, times, positions, and velocities.
+
+    all_initial_positions = np.zeros((num_nodes, 3), dtype=np.float64)
+    all_motion_data = [] # List to store motion data for each particle
+
     for node_id in range(num_nodes):
-        particle = {
-            "id": node_id,
-            "initial_position": nodes_coords[node_id].tolist(),
-            "motion": []
-        }
+        all_initial_positions[node_id] = nodes_coords[node_id]
+
+        # Prepare arrays for current particle's motion
+        particle_times = np.zeros(num_timesteps, dtype=np.float64)
+        particle_positions = np.zeros((num_timesteps, 3), dtype=np.float64)
+        particle_velocities = np.zeros((num_timesteps, 3), dtype=np.float64)
 
         for timestep_idx, time in enumerate(time_steps):
-            velocity = velocity_history[timestep_idx].reshape(num_nodes, 3)[node_id].tolist()  # Reshape velocities dynamically
-            new_position = (nodes_coords[node_id] + np.array(velocity) * time).tolist()
+            # Reshape velocities dynamically. Assuming velocity_history[timestep_idx] has data for all nodes.
+            # It might be (num_nodes, 3) or (grid_dim1, grid_dim2, ..., 3)
+            current_velocities_timestep = velocity_history[timestep_idx].reshape(num_nodes, 3)
+            velocity = current_velocities_timestep[node_id]
+            new_position = nodes_coords[node_id] + velocity * time # Using time as a scalar, not time_steps array.
 
-            particle["motion"].append({
-                "time": float(time),
-                "position": new_position,
-                "velocity": velocity
-            })
+            particle_times[timestep_idx] = time
+            particle_positions[timestep_idx] = new_position
+            particle_velocities[timestep_idx] = velocity
 
-        particles.append(particle)
+        all_motion_data.append({
+            "id": node_id,
+            "times": particle_times,
+            "positions": particle_positions,
+            "velocities": particle_velocities
+        })
 
-    # Save particle motion data to JSON
+    # Save particle motion data to NPY.
+    # We'll save a dictionary that contains the grid_metadata and then a structured array or
+    # a list of dictionaries (which numpy can save as an object array).
+    # Saving a list of dictionaries as an object array with np.save() is straightforward.
+    
     output_data = {
         "grid_metadata": grid_metadata,
-        "particles": particles
+        "initial_positions": all_initial_positions,
+        "particles_motion": all_motion_data # This will be saved as an object array if elements are dictionaries
     }
 
-    with open(output_file, "w") as f:
-        json.dump(output_data, f, indent=4)
+    try:
+        np.save(output_file, output_data)
+        print(f"✅ Fluid particle data saved to {output_file}")
+    except Exception as e:
+        print(f"❌ Error saving data to {output_file}: {e}")
 
-    print(f"✅ Fluid particle data saved to {output_file}")
 
 # Example usage
 if __name__ == "__main__":
@@ -103,5 +129,8 @@ if __name__ == "__main__":
         nodes_file="data/testing-input-output/nodes_coords.npy",
         time_file="data/testing-input-output/time_points.npy",
         grid_metadata_file="data/testing-input-output/grid_metadata.json",
-        output_file="data/testing-input-output/fluid_particles.json"
+        output_file="data/testing-input-output/fluid_particles.npy" # Changed output to .npy
     )
+
+
+

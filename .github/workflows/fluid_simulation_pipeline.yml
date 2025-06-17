@@ -76,8 +76,8 @@ jobs:
         run: ls -R "$GITHUB_WORKSPACE/data/testing-input-output"
 
       # ✅ Execute Unit & Integration Tests After Output File Generation
-      # - name: Run Unit Tests
-      #   run: pytest tests/test_velocity_field_processing.py --verbose
+      - name: Run All Tests
+        run: pytest tests/ --verbose
 
       # - name: Commit and Push Fluid Particle Data to Repository
       #   env:

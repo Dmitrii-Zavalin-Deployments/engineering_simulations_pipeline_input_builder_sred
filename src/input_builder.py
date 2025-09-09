@@ -49,16 +49,9 @@ def build_fluid_simulation_input():
             if key not in data:
                 raise KeyError(f"Missing expected key '{key}' in {name}")
 
-    # Adapt geometry_masking_gmsh.json into a geometry_definition block
-    geometry_definition = {
-        "mask": {
-            "values_flat": geometry_masking["geometry_mask_flat"],
-            "shape": geometry_masking["geometry_mask_shape"],
-            "encoding": geometry_masking.get("mask_encoding"),
-            "flattening_order": geometry_masking.get("flattening_order", "x-major"),
-        },
-        "source": "gmsh_mask_v1"
-    }
+    # Ensure optional flattening_order has a default
+    if "flattening_order" not in geometry_masking:
+        geometry_masking["flattening_order"] = "x-major"
 
     # Merge into final structure
     merged = {
@@ -67,7 +60,7 @@ def build_fluid_simulation_input():
         "initial_conditions": flow_data["initial_conditions"],
         "simulation_parameters": flow_data["simulation_parameters"],
         "boundary_conditions": boundary_conditions,
-        "geometry_definition": geometry_definition
+        "geometry_definition": geometry_masking
     }
 
     # Write output file (overwrite if exists)

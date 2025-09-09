@@ -79,7 +79,7 @@ def test_build_fluid_simulation_input_happy_path(temp_base_dir):
     assert "domain_definition" in merged
     assert "fluid_properties" in merged
     assert "geometry_definition" in merged
-    assert merged["geometry_definition"]["mask"]["values_flat"] == [1, 0, 1]
+    assert merged["geometry_definition"]["geometry_mask_flat"] == [1, 0, 1]
 
 
 @pytest.mark.parametrize("missing_file", [
@@ -125,7 +125,7 @@ def test_geometry_masking_defaults_flattening_order(temp_base_dir):
     output_path = os.path.join(temp_base_dir, ib.OUTPUT_FILE)
     with open(output_path, encoding="utf-8") as f:
         merged = json.load(f)
-    assert merged["geometry_definition"]["mask"]["flattening_order"] == "x-major"
+    assert merged["geometry_definition"]["flattening_order"] == "x-major"
 
 
 def test_performance_large_geometry_mask(temp_base_dir):
@@ -141,7 +141,7 @@ def test_performance_large_geometry_mask(temp_base_dir):
     output_path = os.path.join(temp_base_dir, ib.OUTPUT_FILE)
     with open(output_path, encoding="utf-8") as f:
         merged = json.load(f)
-    assert len(merged["geometry_definition"]["mask"]["values_flat"]) == 1000000
+    assert len(merged["geometry_definition"]["geometry_mask_flat"]) == 1000000
 
 
 

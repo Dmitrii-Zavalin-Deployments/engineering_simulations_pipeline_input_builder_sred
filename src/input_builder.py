@@ -4,8 +4,9 @@ import json
 import os
 import sys
 
-# Base folder where Dropbox downloads are stored
-BASE_DIR = os.path.join('.', 'data', 'testing-input-output')
+# Base folder where Dropbox downloads are stored (resolved relative to this script's location)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, '..', 'data', 'testing-input-output'))
 
 # Filenames for the four input JSONs
 ENRICHED_METADATA_FILE = 'enriched_metadata.json'

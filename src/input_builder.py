@@ -37,17 +37,28 @@ def build_fluid_simulation_input():
     boundary_conditions = load_json_file(os.path.join(BASE_DIR, BOUNDARY_CONDITIONS_FILE))
     geometry_masking = load_json_file(os.path.join(BASE_DIR, GEOMETRY_MASKING_FILE))
 
-    # Validate expected keys
-    for name, data, key in [
-        (ENRICHED_METADATA_FILE, enriched_metadata, 'domain_definition'),
-        (FLOW_DATA_FILE, flow_data, 'fluid_properties'),
-        (FLOW_DATA_FILE, flow_data, 'initial_conditions'),
-        (FLOW_DATA_FILE, flow_data, 'simulation_parameters'),
-        (BOUNDARY_CONDITIONS_FILE, boundary_conditions, None),  # BCs can have varied keys
-        (GEOMETRY_MASKING_FILE, geometry_masking, 'geometry_definition'),
-    ]:
-        if key and key not in data:
-            raise KeyError(f"Missing expected key '{key}' in {name}")
+    # Validate expected keys in each file
+    required_keys = [
+        (ENRICHED_METADATA_FILE, enriched_metadata, ['domain_definition']),
+        (FLOW_DATA_FILE, flow_data, ['fluid_properties', 'initial_conditions', 'simulation_parameters']),
+        # boundary_conditions can be free-form depending on mesh/BC setup
+        (GEOMETRY_MASKING_FILE, geometry_masking, ['geometry_mask_flat', 'geometry_mask_shape']),
+    ]
+    for name, data, keys in required_keys:
+        for key in keys:
+            if key not in data:
+                raise KeyError(f"Missing expected key '{key}' in {name}")
+
+    # Adapt geometry_masking_gmsh.json into a geometry_definition block
+    geometry_definition = {
+        "mask": {
+            "values_flat": geometry_masking["geometry_mask_flat"],
+            "shape": geometry_masking["geometry_mask_shape"],
+            "encoding": geometry_masking.get("mask_encoding"),
+            "flattening_order": geometry_masking.get("flattening_order", "x-major"),
+        },
+        "source": "gmsh_mask_v1"
+    }
 
     # Merge into final structure
     merged = {
@@ -56,7 +67,7 @@ def build_fluid_simulation_input():
         "initial_conditions": flow_data["initial_conditions"],
         "simulation_parameters": flow_data["simulation_parameters"],
         "boundary_conditions": boundary_conditions,
-        "geometry_definition": geometry_masking["geometry_definition"]
+        "geometry_definition": geometry_definition
     }
 
     # Write output file (overwrite if exists)

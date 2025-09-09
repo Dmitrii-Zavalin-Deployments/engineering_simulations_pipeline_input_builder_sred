@@ -34,18 +34,6 @@ jobs:
       - name: Debug Repository Structure
         run: ls -R "$GITHUB_WORKSPACE"
 
-      - name: Verify Script Exists
-        run: |
-          echo "🔎 Checking if generate_blender_format.py exists..."
-          ls -R "$GITHUB_WORKSPACE/src"
-
-          if [ ! -f "$GITHUB_WORKSPACE/src/generate_blender_format.py" ]; then
-            echo "❌ Error: generate_blender_format.py not found!"
-            exit 1
-          else
-            echo "✅ Script found: generate_blender_format.py"
-          fi
-
       - name: Delete All Previous Files in Testing-Input-Output
         run: |
           if [ -d "$GITHUB_WORKSPACE/data/testing-input-output/" ]; then

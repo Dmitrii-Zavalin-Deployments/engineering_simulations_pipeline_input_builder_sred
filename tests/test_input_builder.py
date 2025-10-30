@@ -1,12 +1,9 @@
 # /tests/test_input_builder.py
 
-import io
 import json
 import os
-import sys
 import tempfile
 import shutil
-import builtins
 import pytest
 
 # Import the module under test
@@ -19,17 +16,21 @@ def temp_base_dir(monkeypatch):
     tmpdir = tempfile.mkdtemp()
     monkeypatch.setattr(ib, "BASE_DIR", tmpdir)
 
-    # Minimal valid enriched_metadata.json
-    enriched_metadata = {"domain_definition": {"size": [1, 1, 1]}}
-    # Minimal valid flow_data.json
+    # ✅ Legacy domain keys to test alignment
+    enriched_metadata = {
+        "domain_definition": {
+            "min_x": 0.0, "max_x": 1.0,
+            "min_y": 0.0, "max_y": 1.0,
+            "min_z": 0.0, "max_z": 1.0,
+            "nx": 1, "ny": 1, "nz": 1
+        }
+    }
     flow_data = {
         "fluid_properties": {"density": 1.0},
         "initial_conditions": {"velocity": [0, 0, 0]},
         "simulation_parameters": {"timestep": 0.1}
     }
-    # Minimal valid boundary_conditions_gmsh.json
     boundary_conditions = {"inlet": {"velocity": 1.0}}
-    # Minimal valid geometry_masking_gmsh.json
     geometry_masking = {
         "geometry_mask_flat": [1, 0, 1],
         "geometry_mask_shape": [3, 1, 1],
@@ -75,8 +76,10 @@ def test_build_fluid_simulation_input_happy_path(temp_base_dir):
     assert os.path.exists(output_path)
     with open(output_path, encoding="utf-8") as f:
         merged = json.load(f)
-    # Check merged structure
-    assert "domain_definition" in merged
+    # ✅ Check aligned domain keys
+    domain = merged["domain_definition"]
+    for key in ["x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "nx", "ny", "nz"]:
+        assert key in domain
     assert "fluid_properties" in merged
     assert "geometry_definition" in merged
     assert merged["geometry_definition"]["geometry_mask_flat"] == [1, 0, 1]
@@ -114,7 +117,6 @@ def test_missing_required_key_raises(temp_base_dir, file_name, missing_key):
 
 
 def test_geometry_masking_defaults_flattening_order(temp_base_dir):
-    # Remove flattening_order to trigger default
     path = os.path.join(temp_base_dir, ib.GEOMETRY_MASKING_FILE)
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
@@ -129,19 +131,14 @@ def test_geometry_masking_defaults_flattening_order(temp_base_dir):
 
 
 def test_performance_large_geometry_mask(temp_base_dir):
-    """Guard: ensure large mask merges within reasonable time."""
     path = os.path.join(temp_base_dir, ib.GEOMETRY_MASKING_FILE)
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    data["geometry_mask_flat"] = [1, 0] * 500000  # 1 million entries
+    data["geometry_mask_flat"] = [1, 0] * 500000
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f)
-    # Should run without timeout
     ib.build_fluid_simulation_input()
     output_path = os.path.join(temp_base_dir, ib.OUTPUT_FILE)
     with open(output_path, encoding="utf-8") as f:
         merged = json.load(f)
     assert len(merged["geometry_definition"]["geometry_mask_flat"]) == 1000000
-
-
-

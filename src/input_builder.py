@@ -82,6 +82,17 @@ def build_fluid_simulation_input():
         "geometry_definition": geometry_masking
     }
 
+    # ✅ Add external forces if present in flow_data
+    if "external_forces" in flow_data:
+        merged["external_forces"] = flow_data["external_forces"]
+    else:
+        # Provide a default block to keep schema consistent
+        merged["external_forces"] = {
+            "force_vector": [0.0, 0.0, 0.0],
+            "force_units": "N/m^3",
+            "comment": "Volumetric body force applied uniformly (Fx,Fy,Fz)"
+        }
+
     output_path = os.path.join(BASE_DIR, OUTPUT_FILE)
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(merged, f, indent=2)
@@ -94,3 +105,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+
